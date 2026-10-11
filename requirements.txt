@@ -13,3 +13,4 @@ safetensors
 llama-cpp-python>=0.3
 numpy
 opencv-python
+scikit-image
