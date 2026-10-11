@@ -86,8 +86,20 @@ from diffusers import (
 from diffusers.utils import load_image
 
 ROOT = Path(__file__).parent
-DEFAULT_INPUT = ROOT / "Original.png"
 OUT_DIR = ROOT / "out"
+
+
+def _default_input() -> Path:
+    # README and this repo use original.png. Windows checkouts often show
+    # that same file as Original.png, which is what older runs used.
+    for name in ("original.png", "Original.png"):
+        candidate = ROOT / name
+        if candidate.exists():
+            return candidate
+    return ROOT / "original.png"
+
+
+DEFAULT_INPUT = _default_input()
 
 # Ordered list of GGUF quants to try, best quality first.
 # Each entry is (label, [candidate paths]) — first existing path wins per entry.
