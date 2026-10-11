@@ -13,3 +13,4 @@ pillow
 safetensors
 numpy
 opencv-python
+scikit-image

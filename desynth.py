@@ -86,8 +86,20 @@ from diffusers import (
 from diffusers.utils import load_image
 
 ROOT = Path(__file__).parent
-DEFAULT_INPUT = ROOT / "Original.png"
 OUT_DIR = ROOT / "out"
+
+
+def _default_input() -> Path:
+    # README and this repo use original.png. Windows checkouts often show
+    # that same file as Original.png, which is what older runs used.
+    for name in ("original.png", "Original.png"):
+        candidate = ROOT / name
+        if candidate.exists():
+            return candidate
+    return ROOT / "original.png"
+
+
+DEFAULT_INPUT = _default_input()
 
 # Ordered list of GGUF quants to try, best quality first.
 # Each entry is (label, [candidate paths]) — first existing path wins per entry.
@@ -304,13 +316,22 @@ def _restore(clean_pil, original_pil, *, sigma: float, mode: str = "gaussian", u
     return Image.fromarray(combined.astype("uint8"))
 
 
+def _as_compute(t):
+    # embeds_cache.pt is bfloat16 from the CUDA/MPS precompute. Qwen's img2img
+    # pipeline encodes the init image in prompt_embeds.dtype, so that dtype has
+    # to match the VAE. On CPU the VAE is float32.
+    if torch.is_tensor(t) and torch.is_floating_point(t) and t.dtype != COMPUTE_DTYPE:
+        return t.to(dtype=COMPUTE_DTYPE)
+    return t
+
+
 def _sample(pipe, image, embeds, *, denoise: float, steps: int, seed: int):
     generator = torch.Generator(device="cpu").manual_seed(seed)
     return pipe(
         image=image,
-        prompt_embeds=embeds["prompt_embeds"].unsqueeze(0),
+        prompt_embeds=_as_compute(embeds["prompt_embeds"]).unsqueeze(0),
         prompt_embeds_mask=embeds["prompt_embeds_mask"].unsqueeze(0),
-        negative_prompt_embeds=embeds["negative_prompt_embeds"].unsqueeze(0),
+        negative_prompt_embeds=_as_compute(embeds["negative_prompt_embeds"]).unsqueeze(0),
         negative_prompt_embeds_mask=embeds["negative_prompt_embeds_mask"].unsqueeze(0),
         num_inference_steps=steps,
         true_cfg_scale=CFG,
